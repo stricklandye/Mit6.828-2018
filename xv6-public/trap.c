@@ -21,9 +21,11 @@ tvinit(void)
 
   // 中断处理程序的cs寄存器是kernel code（内核代码段）
   // 系统调用的DPL是DPL_USER，可以给用户来调用
-  // 在发生中断的时候，处理器会自动从
+  // 在发生中断的时候，处理器会自动从idt中获取到中断
   for(i = 0; i < 256; i++)
     SETGATE(idt[i], 0, SEG_KCODE<<3, vectors[i], 0);
+    //trap不会清楚if flag，能够让system call的时候仍然响应中断
+    //设置trap的权限为DPL_USER,这样一来可以让应用程序调用系统调用
   SETGATE(idt[T_SYSCALL], 1, SEG_KCODE<<3, vectors[T_SYSCALL], DPL_USER);
 
   initlock(&tickslock, "time");
@@ -42,6 +44,9 @@ trap(struct trapframe *tf)
   if(tf->trapno == T_SYSCALL){
     if(myproc()->killed)
       exit();
+    //保存当前的trapframe
+    //当trap执行结束后，回到trapasm.S中
+    //再由trapasm.S的trapret返回到用户程序
     myproc()->tf = tf;
     syscall();
     if(myproc()->killed)

@@ -27,6 +27,7 @@
 #include "buf.h"
 
 struct {
+  //buf锁，最多只能有一个线程可以访问该buf
   struct spinlock lock;
 
   //一个持有disk buffer的数组

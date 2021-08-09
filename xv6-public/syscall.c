@@ -21,6 +21,7 @@ fetchint(uint addr, int *ip)
 
   if(addr >= curproc->sz || addr+4 > curproc->sz)
     return -1;
+  //将addr由int转为int*指针，然后再从该指针中获取数据存放到ip中
   *ip = *(int*)(addr);
   return 0;
 }
@@ -49,6 +50,12 @@ fetchstr(uint addr, char **pp)
 int
 argint(int n, int *ip)
 {
+  /**
+   * 系统调用的参数都是位于用户栈当中，而用户栈已经由
+   * 中断发生的时候由cpu压入到了内核栈中。所以可以根据tf->esp来获得
+   * 用户栈中的参数.
+   * fetchint(uint addr,ip)将参数从地址addr中获取，存放到ip中
+  */
   return fetchint((myproc()->tf->esp) + 4 + 4*n, ip);
 }
 
@@ -134,10 +141,13 @@ syscall(void)
   int num;
   struct proc *curproc = myproc();
 
-  num = curproc->tf->eax;
+  num = curproc->tf->eax; //中断号
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
+    //根据num来调用syscalls数组中的系统调用，然后返回值会放在eax中
+    //最后返回给系统调用的调用者
     curproc->tf->eax = syscalls[num]();
   } else {
+    //如果发生了异常就返回-1
     cprintf("%d %s: unknown sys call %d\n",
             curproc->pid, curproc->name, num);
     curproc->tf->eax = -1;

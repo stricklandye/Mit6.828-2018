@@ -1,0 +1,16 @@
+{
+    "files.associations": {
+        "cstdlib": "c",
+        "x86.h": "c",
+        "elf.h": "c",
+        "cmath": "cpp",
+        "type_traits": "cpp",
+        "limits": "cpp",
+        "typeinfo": "cpp",
+        "user.h": "c",
+        "traps.h": "c",
+        "memlayout.h": "c",
+        "*.tcc": "c",
+        "fcntl.h": "c"
+    }
+}

@@ -120,10 +120,9 @@ fileread(struct file *f, char *addr, int n)
   if(f->type == FD_INODE){
     ilock(f->ip);
     
-    // f->ip: 
-    // addr,
-    // f->off,
-    // n
+    // f->ip: inode number
+    // addr:读取写到这里
+    // f->off:从什么offset开始读取
     if((r = readi(f->ip, addr, f->off, n)) > 0)
       f->off += r;
     iunlock(f->ip);

@@ -2,6 +2,10 @@ struct stat;
 struct rtcdate;
 
 // system calls
+/**
+ * 用户程序送使用的fork(),wait()等函数不是直接调用系统中的函数的
+ * 而是先将用户程序要使用的fork()函数等在usys.S中封装。
+*/
 int fork(void);
 int exit(void) __attribute__((noreturn));
 int wait(void);

@@ -9,6 +9,7 @@
 static void startothers(void);
 static void mpmain(void)  __attribute__((noreturn));
 extern pde_t *kpgdir;
+//end是elf文件的末尾，在kernel.ld中定义
 extern char end[]; // first address after kernel loaded from ELF file
 
 // Bootstrap processor starts running C code here.
@@ -16,7 +17,12 @@ extern char end[]; // first address after kernel loaded from ELF file
 // doing some setup required for memory allocator to work.
 int
 main(void)
-{
+{ 
+  /**
+   * 在内核启动后，只使用了低端的0-4mb。但是xv6所需的内存很少
+   * 这4mb中还是有很多内存没有使用的。所以将这4mb妨到物理内存分配器当中
+   * 给将来的内核去分配内存。
+  */
   kinit1(end, P2V(4*1024*1024)); // phys page allocator
   kvmalloc();      // kernel page table
   mpinit();        // detect other processors
@@ -32,6 +38,7 @@ main(void)
   fileinit();      // file table
   ideinit();       // disk 初始化硬盘
   startothers();   // start other processors
+  //将P2V(4*1024*1024), P2V(PHYSTOP)运行时分配的内存池
   kinit2(P2V(4*1024*1024), P2V(PHYSTOP)); // must come after startothers()
   userinit();      // first user process
   mpmain();        // finish this processor's setup
@@ -99,6 +106,9 @@ startothers(void)
 // hence the __aligned__ attribute.
 // PTE_PS in a page directory entry enables 4Mbyte pages.
 
+/**
+ * 使用4mb的页，但是4mb的页只有在boot的阶段才会使用。
+*/
 __attribute__((__aligned__(PGSIZE)))
 pde_t entrypgdir[NPDENTRIES] = {
   // Map VA's [0, 4MB) to PA's [0, 4MB)

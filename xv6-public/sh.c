@@ -102,7 +102,13 @@ runcmd(struct cmd *cmd)
     if(pipe(p) < 0)
       panic("pipe");
     if(fork1() == 0){
-      close(1);
+      /**
+       * fork()会复制父进程的打开文件表到子进程。所以在fork中也要关闭
+       * 管道的描述符.close(1)可以将stdout关闭，然后dup(p[0])将描述符1
+       * 指向p[0]。接着关闭这个进程的打开文件中的pipe描述符，接着去执行pipe
+       * 左边的指令
+      */
+      close(1);  
       dup(p[1]);
       close(p[0]);
       close(p[1]);
@@ -115,8 +121,10 @@ runcmd(struct cmd *cmd)
       close(p[1]);
       runcmd(pcmd->right);
     }
+    //关闭pipe
     close(p[0]);
     close(p[1]);
+    //等待左右两个进程执行结束
     wait();
     wait();
     break;

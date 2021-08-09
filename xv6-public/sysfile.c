@@ -344,8 +344,10 @@ create(char *path, short type, short major, short minor)
   return ip;
 }
 
-int
-sys_open(void)
+/**
+ * 找到path所对应的inode
+*/
+int sys_open(void)
 {
   char *path;
   int fd, omode;

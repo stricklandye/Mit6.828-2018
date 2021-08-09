@@ -539,7 +539,7 @@ readi(struct inode *ip, char *dst, uint off, uint n)
       bmap()函数将off/BSIZE来得到inode中的扇区号。inode中持有一大堆扇区数据，我们
       通过offet/BSIZE来判断该offset对应的是inode第几个扇区。
       bread()读取到的数据并不是直接放到直接放到目标地址，而是先放到缓冲区
-      bread()函数返回的就是那个缓冲区
+      bread()函数返回的就是那个缓冲区的地址
     */
     bp = bread(ip->dev, bmap(ip, off/BSIZE));
     m = min(n - tot, BSIZE - off%BSIZE);

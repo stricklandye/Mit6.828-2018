@@ -3,9 +3,9 @@ struct buf {
   uint dev; //当前buffer对应的device
   uint blockno; //当前buffer对应 扇区号
   struct sleeplock lock;
-  uint refcnt;
+  uint refcnt;      
   struct buf *prev; // LRU cache list
-  struct buf *next;
+  struct buf *next; //一个双向环形链表来管理缓冲区
   struct buf *qnext; // disk queue
 
   uchar data[BSIZE]; //当前内存中的数据，是第blockno扇区数据的copy

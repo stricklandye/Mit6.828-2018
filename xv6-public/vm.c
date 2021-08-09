@@ -35,14 +35,30 @@ seginit(void)
 static pte_t *
 walkpgdir(pde_t *pgdir, const void *va, int alloc)
 {
+  /**
+   * 返回页表项的地址。
+   * 首先需要判断页目录是否存在，如果不存在的话就需要先创建
+   * 页目录，然后再去创建页表项。最后返回页表项的地址
+  */
   pde_t *pde;
   pte_t *pgtab;
 
   pde = &pgdir[PDX(va)];
-  if(*pde & PTE_P){
-    pgtab = (pte_t*)P2V(PTE_ADDR(*pde));
+  if(*pde & PTE_P){ 
+    /**
+     * 判断页目录项（也就是页表的物理地址）是否存在
+     * 如果存在的话就可以直接返回页表项（页）的虚拟地址
+    */
+    pgtab = (pte_t*)P2V(PTE_ADDR(*pde)); 
   } else {
+    /**
+     * 如果页目录项不存在的话，就要创建页目录项。
+     * 然后再返回页表项
+    */
     if(!alloc || (pgtab = (pte_t*)kalloc()) == 0)
+    //从空闲的页中分配一个页作为页目录项
+    //返回的是可用页的虚拟地址
+    //所以用V2P将虚拟地址转为物理地址
       return 0;
     // Make sure all those PTE_P bits are zero.
     memset(pgtab, 0, PGSIZE);
@@ -57,19 +73,26 @@ walkpgdir(pde_t *pgdir, const void *va, int alloc)
 // Create PTEs for virtual addresses starting at va that refer to
 // physical addresses starting at pa. va and size might not
 // be page-aligned.
+/**
+ * 将虚拟地址va映射到物理地址pa，需要映射的地址大小是size
+ * 页表项的权限是perm
+*/
 static int
 mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm)
-{
+{ 
   char *a, *last;
   pte_t *pte;
 
-  a = (char*)PGROUNDDOWN((uint)va);
-  last = (char*)PGROUNDDOWN(((uint)va) + size - 1);
+  a = (char*)PGROUNDDOWN((uint)va); //映射的地址向下取整
+  last = (char*)PGROUNDDOWN(((uint)va) + size - 1); 
   for(;;){
-    if((pte = walkpgdir(pgdir, a, 1)) == 0)
+    //创建对应的页表，并且返回页表项的地址
+    //这里返回的是页表项的虚拟地址，这样我们就可以直接访问到
+    if((pte = walkpgdir(pgdir, a, 1)) == 0) 
       return -1;
     if(*pte & PTE_P)
       panic("remap");
+    //设置页表项内容，页的物理地址以及权限，pte_p表示在内存中
     *pte = pa | perm | PTE_P;
     if(a == last)
       break;
@@ -102,6 +125,8 @@ mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm)
 
 // This table defines the kernel's mappings, which are present in
 // every process's page table.
+
+//下面的数组描述了如何对内核的内存进行映射。
 static struct kmap {
   void *virt;
   uint phys_start;
@@ -121,6 +146,13 @@ setupkvm(void)
   pde_t *pgdir;
   struct kmap *k;
 
+  /**
+   * 在一开始引导内核的时候，将虚拟地址0-4mb映射到了物理地址的0-4mb
+   * 这些函数所以都能够正常的运行.
+   * 使用kalloc()来分配一个页.来当作页目录，接着就是将
+   * 内核的内存结构同虚拟地址和物理地址之间映射起来。
+   * kalloc()返回的是可用页的虚拟地址
+  */
   if((pgdir = (pde_t*)kalloc()) == 0)
     return 0;
   memset(pgdir, 0, PGSIZE);
@@ -139,7 +171,10 @@ setupkvm(void)
 // space for scheduler processes.
 void
 kvmalloc(void)
-{
+{ 
+  //为内核分配页目录，返回的kpgdir是虚拟地址
+  //所以在switchkvm()中还要将他转为物理地址
+  
   kpgdir = setupkvm();
   switchkvm();
 }
@@ -231,6 +266,7 @@ allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
 
   a = PGROUNDUP(oldsz);
   for(; a < newsz; a += PGSIZE){
+    //kalloc返回一个可用的页的虚拟地址
     mem = kalloc();
     if(mem == 0){
       cprintf("allocuvm out of memory\n");
@@ -238,6 +274,7 @@ allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
       return 0;
     }
     memset(mem, 0, PGSIZE);
+    //kalloc返回的是虚拟地址，所以下面映射的时候要用v2p转换一下
     if(mappages(pgdir, (char*)a, PGSIZE, V2P(mem), PTE_W|PTE_U) < 0){
       cprintf("allocuvm out of memory (2)\n");
       deallocuvm(pgdir, newsz, oldsz);

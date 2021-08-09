@@ -44,13 +44,22 @@ _start = V2P_WO(entry)
 .globl entry
 entry:
   # Turn on page size extension for 4Mbyte pages
+  # 默认情况下页的大小是4kb,设置CR4寄存器的PSE位置
+  # 来开启4mb的页
   movl    %cr4, %eax
   orl     $(CR4_PSE), %eax
   movl    %eax, %cr4
   # Set page directory
+  # main.c中的entrypgdir将虚拟地址的 0 - 4mb 映射到物理地址的 0 - 4mb
+  # 也将虚拟地址的 KERENBASE - KERENBASE + 4mb 映射到物理地址的0 - 4mb
+  # 注意，在cr3寄存器中的页目录的地址是要物理地址，所以用V2P_WO将entrypgdir
+  # 转为物理地址。entrypgdir在经过连接之后，它的地址是高于KERNBASE的，所以
+  # 这里用V2P_WO来将地址转为物理地址
   movl    $(V2P_WO(entrypgdir)), %eax
   movl    %eax, %cr3
   # Turn on paging.
+  # CR0_PG:开启页表
+  # CR0_WP:在特权级0的情况下，也不能写入read-only的页
   movl    %cr0, %eax
   orl     $(CR0_PG|CR0_WP), %eax
   movl    %eax, %cr0
@@ -62,6 +71,7 @@ entry:
   # high addresses. The indirect call is needed because
   # the assembler produces a PC-relative instruction
   # for a direct jump.
+  # 跳转到mian.c的main函数去运行
   mov $main, %eax
   jmp *%eax
 

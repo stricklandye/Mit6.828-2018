@@ -8,11 +8,12 @@
 # exec(init, argv)
 .globl start
 start:
+# 参数从右到左入栈
   pushl $argv
   pushl $init
   pushl $0  // where caller pc would be
-  movl $SYS_exec, %eax
-  int $T_SYSCALL
+  movl $SYS_exec, %eax 
+  int $T_SYSCALL # idt的64号中断留给系统调用
 
 # for(;;) exit();
 exit:

@@ -122,6 +122,7 @@ xchg(volatile uint *addr, uint newval)
 {
   uint result;
 
+  //lock前缀保证访问的原子性
   // The + in "+m" denotes a read-modify-write operand.
   asm volatile("lock; xchgl %0, %1" :
                "+m" (*addr), "=a" (result) :

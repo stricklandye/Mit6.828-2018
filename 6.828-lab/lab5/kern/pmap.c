@@ -490,7 +490,6 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 	pte_t* pg_table_va = NULL;
 	struct PageInfo* new_page = NULL;
 
-
 	if(*pg_dir_entry & PTE_P) {
 		physaddr_t pg_table_pa = PTE_ADDR(*pg_dir_entry); //获得pg_table_pa的物理地址
 		pg_table_va = KADDR(pg_table_pa); //将pg_table的物理地址转为虚拟地址

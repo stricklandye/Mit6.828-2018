@@ -70,8 +70,22 @@ myproc(void) {
 // If found, change state to EMBRYO and initialize
 // state required to run in the kernel.
 // Otherwise return 0.
-static struct proc*
-allocproc(void)
+/**
+ * x86保护模式中不能以各种跳转指令来直接从内核态跳转到用户态
+ * 所以，在创建子进程的时候，我们通过模拟中断的返回来从内核态回到用户态。
+ * 在xv6中，新建一个进程，我们就将他的trapframe来构建为xv6 book中图1-4的形态
+ * 让eip指向forkret。当进程创建后，并且经过sched()得到调度之后，执行的首先是
+ * 几条pop语句（在swtch.s）中，然后对于新建的进程来说，eip都是指向forkret。
+ * 
+ * 而forkret转为指令后，总归是有一句ret指令的。而此时栈当中存放的地址是trapret
+ * 这就是的进程跳转到trapret去执行，接着恢复了它的trapframe(虽然是中父进程中获得的)，
+ * 最终iret跳转到了用户代码去执行。此时的内存中内容还是和父进程一模一样，接下来
+ * 再去使用exec()系统调用就可以执行用户自己的程序了。
+ * 
+ * 因为我们在fork中对trapframe的eax设置为了0，后面trapframe返回的时候将
+ * tf->eax 弹出到了eax中，所以fork()就出现了一次执行，两个不同的返回值的现象
+*/
+static struct proc* allocproc(void)
 {
   struct proc *p;
   char *sp;
@@ -92,6 +106,8 @@ found:
   release(&ptable.lock);
 
   // Allocate kernel stack.
+  // 为进程分配一个内核栈,p->stack指向的是栈底地址
+  // 所以在tss中，esp0 = p->stack + KSTACKSIZE
   if((p->kstack = kalloc()) == 0){
     p->state = UNUSED;
     return 0;
@@ -99,6 +115,8 @@ found:
   sp = p->kstack + KSTACKSIZE;
 
   // Leave room for trap frame.
+  //为trapframe留出空间，将来通过对trapframe修改
+  // 就能够回到用户进程中
   sp -= sizeof *p->tf;
   p->tf = (struct trapframe*)sp;
 
@@ -108,8 +126,11 @@ found:
   *(uint*)sp = (uint)trapret;
 
   sp -= sizeof *p->context;
+  //为用户进程的context预留空间
   p->context = (struct context*)sp;
   memset(p->context, 0, sizeof *p->context);
+  //context的eip为forkret,切换上下文运行的就是forkret
+  //在forkret中ret指令会跳转到trapert，然后在回到用户进程
   p->context->eip = (uint)forkret;
 
   return p;
@@ -133,6 +154,7 @@ userinit(void)
   memset(p->tf, 0, sizeof(*p->tf));
   //将特权级设置为用户级，(SEG_UCODE << 3)是因为保护模式的
   //的CPL位位于低3bit，所以要移位。剩下的位才是用于索引
+  //下面的代码来初始化trapframe，用于执行用于程序
   p->tf->cs = (SEG_UCODE << 3) | DPL_USER;
   p->tf->ds = (SEG_UDATA << 3) | DPL_USER;
   p->tf->es = p->tf->ds;
@@ -179,6 +201,12 @@ growproc(int n)
 // Create a new process copying p as the parent.
 // Sets up stack to return as if from system call.
 // Caller must set state of returned proc to RUNNABLE.
+/**
+ * fork()是一个系统调用，用于创建新的进程。我们首先使用allocproc()
+ * 来从获得一个空闲的槽位。fork()调用者的trapframe会赋值给新创建进程的trapframe
+ * 此外，fork()还复制了父进程的页表内容，打开的文件等内容给子进程
+ * np->tf->eax = 0;使得子进程中返回值为0，至于如何使得子进程开始执行，看allocproc()中的操作
+*/
 int
 fork(void)
 {
@@ -194,7 +222,7 @@ fork(void)
 
   // Copy process state from proc.
   // 复制父进程的地址映射关系到子进程的page directory当中
-  //copyubm()的注释信息
+  // 下面是:copyubm()的注释信息
   // Given a parent process's page table, create a copy
   // of it for a child.
   if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0){
@@ -208,8 +236,7 @@ fork(void)
   *np->tf = *curproc->tf;
 
   // Clear %eax so that fork returns 0 in the child.
-  //修改结构体中eax寄存器的内容，
-  // 这个eax将作为pid返回到子进程当中
+  // eax在trapret中将会返回
   np->tf->eax = 0;
 
   //复制当前进程的file 到子进程当中
@@ -297,6 +324,7 @@ wait(void)
       if(p->parent != curproc)
         continue;
       havekids = 1;
+      //已经退出但是还没有被父进程处理的进程将是zombie状态
       if(p->state == ZOMBIE){
         // Found one.
         pid = p->pid;
@@ -356,6 +384,7 @@ scheduler(void)
       switchuvm(p);
       p->state = RUNNING;
 
+      //swtch在swtch.s中
       swtch(&(c->scheduler), p->context);
       switchkvm();
 
